@@ -1,0 +1,14 @@
+{
+  "name": "ai-gm-week2",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:client": "npm --prefix apps/client run dev",
+    "dev:server": "npm --prefix apps/server run dev",
+    "build:client": "npm --prefix apps/client run build",
+    "build:server": "npm --prefix apps/server run build"
+  }
+}
