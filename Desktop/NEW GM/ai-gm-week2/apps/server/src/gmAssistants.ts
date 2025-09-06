@@ -42,7 +42,7 @@ router.post("/message", async (req, res) => {
     if (!threadId || !content) {
       return res.status(400).json({ error: "threadId and content required" });
     }
-    // POSitional: (threadId, payload)
+    // POSitional in your SDK: (threadId, payload)
     await client.beta.threads.messages.create(threadId, {
       role: "user",
       content,
@@ -59,7 +59,7 @@ router.post("/run", async (req, res) => {
   if (!threadId) return res.status(400).json({ error: "threadId required" });
 
   try {
-    // POSitional: (threadId, payload)
+    // POSitional in your SDK: (threadId, payload)
     const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
@@ -73,8 +73,13 @@ router.post("/run", async (req, res) => {
         return res.status(504).json({ error: "run timeout" });
       }
       await sleep(800);
-      // POSitional: (threadId, runId)
-      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+
+      // OBJECT form required by your SDK for retrieve (fixes TS2345):
+      const latest = await client.beta.threads.runs.retrieve({
+        thread_id: threadId,
+        run_id: run.id,
+      });
+
       status = latest.status;
     }
 
@@ -82,7 +87,7 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // POSitional: (threadId, params)
+    // POSitional in your SDK: (threadId, params)
     const list = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
