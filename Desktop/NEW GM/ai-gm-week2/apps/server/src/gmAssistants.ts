@@ -32,7 +32,9 @@ router.post("/thread", async (_req, res) => {
     res.json({ threadId: thread.id });
   } catch (e: any) {
     console.error("[/api/gm/thread] error:", e?.message || e);
-    res.status(500).json({ error: "thread error", detail: String(e?.message || e) });
+    res
+      .status(500)
+      .json({ error: "thread error", detail: String(e?.message || e) });
   }
 });
 
@@ -40,7 +42,9 @@ router.post("/message", async (req, res) => {
   try {
     const { threadId, content } = req.body ?? {};
     if (!threadId || !content) {
-      return res.status(400).json({ error: "threadId and content required" });
+      return res
+        .status(400)
+        .json({ error: "threadId and content required" });
     }
     await client.beta.threads.messages.create(threadId, {
       role: "user",
@@ -49,7 +53,9 @@ router.post("/message", async (req, res) => {
     res.json({ ok: true });
   } catch (e: any) {
     console.error("[/api/gm/message] error:", e?.message || e);
-    res.status(500).json({ error: "message error", detail: String(e?.message || e) });
+    res
+      .status(500)
+      .json({ error: "message error", detail: String(e?.message || e) });
   }
 });
 
@@ -72,7 +78,13 @@ router.post("/run", async (req, res) => {
         return res.status(504).json({ error: "run timeout" });
       }
       await sleep(800);
-      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+
+      // ✅ FIXED: use object params
+      const latest = await client.beta.threads.runs.retrieve({
+        thread_id: threadId,
+        run_id: run.id,
+      });
+
       status = latest.status;
     }
 
@@ -94,23 +106,26 @@ router.post("/run", async (req, res) => {
     if (assistantMsg) {
       for (const part of assistantMsg.content) {
         if (part.type === "text") {
-          reply += (reply ? "\n" : "") + (part as Extract<MsgPart, { type: "text" }>).text.value;
+          reply +=
+            (reply ? "\n" : "") +
+            (part as Extract<MsgPart, { type: "text" }>).text.value;
         }
       }
     }
 
     if (!reply) {
-      // Return a helpful hint if nothing was found
       return res.status(200).json({
         reply:
-          "(Brak odpowiedzi MG. Sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
+          "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
       });
     }
 
     res.json({ reply });
   } catch (e: any) {
     console.error("[/api/gm/run] error:", e?.message || e);
-    res.status(500).json({ error: "run error", detail: String(e?.message || e) });
+    res
+      .status(500)
+      .json({ error: "run error", detail: String(e?.message || e) });
   }
 });
 
