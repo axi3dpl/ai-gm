@@ -15,7 +15,7 @@ if (!ASSISTANT_ID) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Minimal shape for messages we read back from the API
+// Minimal shapes for messages
 type MsgPart =
   | { type: "text"; text: { value: string } }
   | { type: string; [k: string]: any };
@@ -32,9 +32,7 @@ router.post("/thread", async (_req, res) => {
     res.json({ threadId: thread.id });
   } catch (e: any) {
     console.error("[/api/gm/thread] error:", e?.message || e);
-    res
-      .status(500)
-      .json({ error: "thread error", detail: String(e?.message || e) });
+    res.status(500).json({ error: "thread error", detail: String(e?.message || e) });
   }
 });
 
@@ -42,21 +40,17 @@ router.post("/message", async (req, res) => {
   try {
     const { threadId, content } = req.body ?? {};
     if (!threadId || !content) {
-      return res
-        .status(400)
-        .json({ error: "threadId and content required" });
+      return res.status(400).json({ error: "threadId and content required" });
     }
-    await client.beta.threads.messages.create({
-      thread_id: threadId,
+    // POSitional: (threadId, payload)
+    await client.beta.threads.messages.create(threadId, {
       role: "user",
       content,
     });
     res.json({ ok: true });
   } catch (e: any) {
     console.error("[/api/gm/message] error:", e?.message || e);
-    res
-      .status(500)
-      .json({ error: "message error", detail: String(e?.message || e) });
+    res.status(500).json({ error: "message error", detail: String(e?.message || e) });
   }
 });
 
@@ -65,13 +59,12 @@ router.post("/run", async (req, res) => {
   if (!threadId) return res.status(400).json({ error: "threadId required" });
 
   try {
-    // Start a run on the assistant
-    const run = await client.beta.threads.runs.create({
-      thread_id: threadId,
+    // POSitional: (threadId, payload)
+    const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
-    // Poll until the run finishes (with 60s timeout)
+    // Poll until done (60s timeout)
     const startTs = Date.now();
     let status = run.status;
 
@@ -80,12 +73,8 @@ router.post("/run", async (req, res) => {
         return res.status(504).json({ error: "run timeout" });
       }
       await sleep(800);
-
-      const latest = await client.beta.threads.runs.retrieve({
-        thread_id: threadId,
-        run_id: run.id,
-      });
-
+      // POSitional: (threadId, runId)
+      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
       status = latest.status;
     }
 
@@ -93,9 +82,8 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // Fetch several recent messages and pick the newest *assistant* one
-    const list = await client.beta.threads.messages.list({
-      thread_id: threadId,
+    // POSitional: (threadId, params)
+    const list = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
     });
@@ -108,9 +96,7 @@ router.post("/run", async (req, res) => {
     if (assistantMsg) {
       for (const part of assistantMsg.content) {
         if (part.type === "text") {
-          reply +=
-            (reply ? "\n" : "") +
-            (part as Extract<MsgPart, { type: "text" }>).text.value;
+          reply += (reply ? "\n" : "") + (part as Extract<MsgPart, { type: "text" }>).text.value;
         }
       }
     }
@@ -125,9 +111,7 @@ router.post("/run", async (req, res) => {
     res.json({ reply });
   } catch (e: any) {
     console.error("[/api/gm/run] error:", e?.message || e);
-    res
-      .status(500)
-      .json({ error: "run error", detail: String(e?.message || e) });
+    res.status(500).json({ error: "run error", detail: String(e?.message || e) });
   }
 });
 
