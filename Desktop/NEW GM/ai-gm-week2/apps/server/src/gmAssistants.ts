@@ -42,8 +42,8 @@ router.post("/message", async (req, res) => {
     if (!threadId || !content) {
       return res.status(400).json({ error: "threadId and content required" });
     }
-    // POSitional in your SDK: (threadId, payload)
-    await client.beta.threads.messages.create(threadId, {
+    // Cast to any to avoid SDK signature mismatches
+    await (client as any).beta.threads.messages.create(threadId, {
       role: "user",
       content,
     });
@@ -59,14 +59,14 @@ router.post("/run", async (req, res) => {
   if (!threadId) return res.status(400).json({ error: "threadId required" });
 
   try {
-    // POSitional in your SDK: (threadId, payload)
-    const run = await client.beta.threads.runs.create(threadId, {
+    // Start run (cast to any to be agnostic to SDK version)
+    const run = await (client as any).beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
     // Poll until done (60s timeout)
     const startTs = Date.now();
-    let status = run.status;
+    let status = run.status as string;
 
     while (status === "queued" || status === "in_progress") {
       if (Date.now() - startTs > 60_000) {
@@ -74,21 +74,17 @@ router.post("/run", async (req, res) => {
       }
       await sleep(800);
 
-      // OBJECT form required by your SDK for retrieve (fixes TS2345):
-      const latest = await client.beta.threads.runs.retrieve({
-        thread_id: threadId,
-        run_id: run.id,
-      });
-
-      status = latest.status;
+      // Retrieve (cast to any; supports positional or object under the hood)
+      const latest = await (client as any).beta.threads.runs.retrieve(threadId, run.id);
+      status = latest.status as string;
     }
 
     if (status !== "completed") {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // POSitional in your SDK: (threadId, params)
-    const list = await client.beta.threads.messages.list(threadId, {
+    // List messages (cast to any; use positional signature)
+    const list = await (client as any).beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
     });
