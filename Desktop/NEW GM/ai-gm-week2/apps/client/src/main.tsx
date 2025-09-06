@@ -145,7 +145,7 @@ function App(){
   if(screen==='auth') return <AuthScreen onDone={()=>setScreen('start')} />
   if(screen==='new') return <NewCampaignForm onBack={()=>setScreen('start')} />
   if(screen==='list') return <CampaignList onBack={()=>setScreen('start')} />
-  if(screen==='gm') return <GmChat />   {/* 👈 new GM chat screen */}
+  if(screen==='gm') return <GmChat />   {/* 👈 GM chat screen */}
 
   return (
     <StartScreen
@@ -157,4 +157,8 @@ function App(){
   )
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+// ✅ safer render call
+const root = document.getElementById('root')
+if (root) {
+  createRoot(root).render(<App />)
+}
