@@ -46,7 +46,8 @@ router.post("/message", async (req, res) => {
         .status(400)
         .json({ error: "threadId and content required" });
     }
-    await client.beta.threads.messages.create(threadId, {
+    await client.beta.threads.messages.create({
+      thread_id: threadId,
       role: "user",
       content,
     });
@@ -65,7 +66,8 @@ router.post("/run", async (req, res) => {
 
   try {
     // Start a run on the assistant
-    const run = await client.beta.threads.runs.create(threadId, {
+    const run = await client.beta.threads.runs.create({
+      thread_id: threadId,
       assistant_id: ASSISTANT_ID,
     });
 
@@ -79,7 +81,6 @@ router.post("/run", async (req, res) => {
       }
       await sleep(800);
 
-      // ✅ FIXED: use object params
       const latest = await client.beta.threads.runs.retrieve({
         thread_id: threadId,
         run_id: run.id,
@@ -93,7 +94,8 @@ router.post("/run", async (req, res) => {
     }
 
     // Fetch several recent messages and pick the newest *assistant* one
-    const list = await client.beta.threads.messages.list(threadId, {
+    const list = await client.beta.threads.messages.list({
+      thread_id: threadId,
       order: "desc",
       limit: 20,
     });
