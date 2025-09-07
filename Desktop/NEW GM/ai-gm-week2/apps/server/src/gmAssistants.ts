@@ -48,8 +48,8 @@ router.post("/message", async (req, res) => {
       return res.status(400).json({ error: "threadId and content required" });
     }
     
-    // Use type assertion to handle SDK version differences
-    const message = await (client.beta.threads.messages as any).create(threadId, {
+    // Fixed: Correct parameter order for creating a message
+    const message = await client.beta.threads.messages.create(threadId, {
       role: "user",
       content: content,
     });
@@ -79,9 +79,9 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: "Assistant ID not configured" });
     }
 
-    // Start run - use type assertion to handle SDK version differences
-    console.log("[/api/gm/run] Creating run...");
-    const run = await (client.beta.threads.runs as any).create(threadId, {
+    // Fixed: Correct parameter order for creating a run
+    console.log("[/api/gm/run] Creating run with threadId:", threadId, "and assistant_id:", ASSISTANT_ID);
+    const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
@@ -99,8 +99,8 @@ router.post("/run", async (req, res) => {
       
       await sleep(800);
       
-      // Use type assertion to handle SDK version differences
-      const latest = await (client.beta.threads.runs as any).retrieve(threadId, run.id);
+      // Fixed: Correct parameter order for retrieving a run
+      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
       status = latest.status;
       console.log("[/api/gm/run] Run status:", status);
     }
@@ -110,8 +110,8 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // List messages - use type assertion to handle SDK version differences
-    const list = await (client.beta.threads.messages as any).list(threadId, {
+    // Fixed: Correct way to list messages
+    const list = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
     });
