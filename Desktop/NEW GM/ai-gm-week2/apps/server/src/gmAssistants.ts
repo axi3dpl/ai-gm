@@ -65,12 +65,13 @@ router.post("/message", async (req, res) => {
 router.post("/run", async (req, res) => {
   try {
     const { threadId } = req.body ?? {};
-    console.log("[/api/gm/run] Received threadId:", threadId);
+    console.log("[/api/gm/run] Received request body:", req.body);
+    console.log("[/api/gm/run] Extracted threadId:", threadId, "type:", typeof threadId);
     console.log("[/api/gm/run] Using ASSISTANT_ID:", ASSISTANT_ID);
     
-    if (!threadId) {
-      console.error("[/api/gm/run] Missing threadId");
-      return res.status(400).json({ error: "threadId required" });
+    if (!threadId || typeof threadId !== 'string') {
+      console.error("[/api/gm/run] Invalid threadId:", threadId);
+      return res.status(400).json({ error: "Valid threadId required" });
     }
 
     if (!ASSISTANT_ID) {

@@ -15,13 +15,16 @@ export default function GmChat() {
   React.useEffect(() => {
     (async () => {
       try {
+        console.log('[GmChat] Creating initial thread...');
         const r = await fetch(`${base}/api/gm/thread`, { method: 'POST' });
         if (!r.ok) throw new Error(`thread ${r.status}`);
-        const { threadId } = await r.json();
-        setThreadId(threadId);
+        const { threadId: newThreadId } = await r.json();
+        console.log('[GmChat] Thread created:', newThreadId);
+        setThreadId(newThreadId);
         // kick off with "Start" once thread exists
-        await sendInternal(threadId, 'Start');
+        await sendInternal(newThreadId, 'Start');
       } catch (e: any) {
+        console.error('[GmChat] Failed to create thread:', e);
         // don't block UI; user can still type and we'll create thread on first send
         setError('Nie udało się połączyć z Mistrzem Gry. Spróbuj wysłać wiadomość ponownie.');
       }
@@ -29,37 +32,51 @@ export default function GmChat() {
   }, [base]);
 
   async function ensureThread(): Promise<string> {
-    if (threadId) return threadId;
+    if (threadId) {
+      console.log('[GmChat] Using existing thread:', threadId);
+      return threadId;
+    }
+    console.log('[GmChat] Creating new thread...');
     const r = await fetch(`${base}/api/gm/thread`, { method: 'POST' });
     if (!r.ok) throw new Error(`thread ${r.status}`);
-    const { threadId: tid } = await r.json();
-    setThreadId(tid);
-    return tid;
+    const { threadId: newThreadId } = await r.json();
+    console.log('[GmChat] New thread created:', newThreadId);
+    setThreadId(newThreadId);
+    return newThreadId;
   }
 
-  async function sendInternal(tid: string, text: string) {
+  async function sendInternal(currentThreadId: string, text: string) {
+    console.log('[GmChat] sendInternal called with:', { currentThreadId, text });
     setLog((l) => [...l, { from: 'me', text }]);
     setBusy(true);
     setError('');
+    
     try {
       // add user message
+      console.log('[GmChat] Adding message to thread:', currentThreadId);
       const r1 = await fetch(`${base}/api/gm/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId: tid, content: text }),
+        body: JSON.stringify({ threadId: currentThreadId, content: text }),
       });
       if (!r1.ok) throw new Error(`message ${r1.status}`);
 
       // run assistant
+      console.log('[GmChat] Running assistant on thread:', currentThreadId);
       const r2 = await fetch(`${base}/api/gm/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId: tid }),
+        body: JSON.stringify({ threadId: currentThreadId }),
       });
-      if (!r2.ok) throw new Error(`run ${r2.status}`);
+      if (!r2.ok) {
+        const errorText = await r2.text();
+        console.error('[GmChat] Run failed:', r2.status, errorText);
+        throw new Error(`run ${r2.status}: ${errorText}`);
+      }
       const { reply } = await r2.json();
       setLog((l) => [...l, { from: 'gm', text: reply }]);
     } catch (e: any) {
+      console.error('[GmChat] Error in sendInternal:', e);
       setError('Problem z odpowiedzią MG. Sprawdź połączenie i spróbuj ponownie.');
     } finally {
       setBusy(false);
@@ -71,9 +88,10 @@ export default function GmChat() {
     if (!text || busy) return;
     setInput('');
     try {
-      const tid = await ensureThread();
-      await sendInternal(tid, text);
+      const currentThreadId = await ensureThread();
+      await sendInternal(currentThreadId, text);
     } catch (e: any) {
+      console.error('[GmChat] Error in onSend:', e);
       setError('Nie mogę utworzyć rozmowy z MG. Sprawdź konfigurację.');
     }
   }
@@ -81,6 +99,11 @@ export default function GmChat() {
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: 16, fontFamily: 'system-ui' }}>
       <h2 style={{ marginBottom: 12 }}>AI Mistrz Gry — tworzenie fabuły</h2>
+      
+      {/* Debug info */}
+      <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+        Thread ID: {threadId || 'none'}
+      </div>
 
       {error && (
         <div style={{ background: '#3b0d0d', color: '#ffd7d7', padding: 10, borderRadius: 8, marginBottom: 8 }}>
@@ -115,7 +138,6 @@ export default function GmChat() {
           placeholder="Napisz do Mistrza Gry…"
           style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #374151', background: '#0b0f1a', color: '#fff' }}
         />
-        {/* Enable as long as there is text and we're not busy (no longer blocked by missing thread) */}
         <button disabled={busy || !input.trim()} onClick={onSend}>Wyślij</button>
       </div>
 
