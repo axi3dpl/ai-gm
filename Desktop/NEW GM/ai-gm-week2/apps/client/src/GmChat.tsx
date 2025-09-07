@@ -3,8 +3,13 @@ import React from 'react';
 type Msg = { from: 'gm' | 'me'; text: string };
 
 export default function GmChat() {
-  const [threadId, setThreadId] = React.useState<string>();
-  const [log, setLog] = React.useState<Msg[]>([]);
+  const [threadId, setThreadId] = React.useState<string | undefined>(() =>
+    localStorage.getItem('gm_thread_id') || undefined
+  );
+  const [log, setLog] = React.useState<Msg[]>(() => {
+    const saved = localStorage.getItem('gm_chat_log');
+    return saved ? (JSON.parse(saved) as Msg[]) : [];
+  });
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
@@ -13,6 +18,7 @@ export default function GmChat() {
 
   // Try to auto-create a thread on mount (non-blocking)
   React.useEffect(() => {
+    if (threadId) return;
     (async () => {
       try {
         console.log('[GmChat] Creating initial thread...');
@@ -21,15 +27,23 @@ export default function GmChat() {
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
         setThreadId(newThreadId);
-        // kick off with "Start" once thread exists
         await sendInternal(newThreadId, 'Start');
       } catch (e: any) {
         console.error('[GmChat] Failed to create thread:', e);
-        // don't block UI; user can still type and we'll create thread on first send
         setError('Nie udało się połączyć z Mistrzem Gry. Spróbuj wysłać wiadomość ponownie.');
       }
     })();
-  }, [base]);
+  }, [base, threadId]);
+
+  React.useEffect(() => {
+    if (threadId) {
+      localStorage.setItem('gm_thread_id', threadId);
+    }
+  }, [threadId]);
+
+  React.useEffect(() => {
+    localStorage.setItem('gm_chat_log', JSON.stringify(log));
+  }, [log]);
 
   async function ensureThread(): Promise<string> {
     if (threadId) {

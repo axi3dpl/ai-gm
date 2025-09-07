@@ -130,17 +130,34 @@ function CampaignList({ onBack }: { onBack: () => void }) {
 }
 
 export default function App() {
-  const [screen, setScreen] = React.useState<Screen>('auth')
+  const [screen, setScreen] = React.useState<Screen>(() => {
+    const saved = localStorage.getItem('screen') as Screen | null
+    return saved || 'auth'
+  })
   const [ready, setReady] = React.useState(false)
 
   React.useEffect(() => {
+    localStorage.setItem('screen', screen)
+  }, [screen])
+
+  React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setScreen(data.session ? 'start' : 'auth')
+      if (data.session) {
+        const saved = localStorage.getItem('screen') as Screen | null
+        setScreen(saved && saved !== 'auth' ? saved : 'start')
+      } else {
+        setScreen('auth')
+      }
       setReady(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-      setScreen(session ? 'start' : 'auth')
-    )
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) {
+        const saved = localStorage.getItem('screen') as Screen | null
+        setScreen(saved && saved !== 'auth' ? saved : 'start')
+      } else {
+        setScreen('auth')
+      }
+    })
     return () => {
       sub.subscription.unsubscribe()
     }
