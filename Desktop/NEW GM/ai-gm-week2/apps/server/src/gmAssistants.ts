@@ -99,8 +99,10 @@ router.post("/run", async (req, res) => {
       
       await sleep(800);
       
-      // Fixed: Correct parameter order for retrieving a run
-      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+      // Fixed: Retrieve run by passing the run ID first and thread ID as a param object
+      const latest = await client.beta.threads.runs.retrieve(run.id, {
+        thread_id: threadId,
+      });
       status = latest.status;
       console.log("[/api/gm/run] Run status:", status);
     }
