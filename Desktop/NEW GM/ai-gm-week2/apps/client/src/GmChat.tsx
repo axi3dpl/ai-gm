@@ -2,7 +2,15 @@ import React from 'react';
 
 type Msg = { from: 'gm' | 'me'; text: string };
 
-export default function GmChat({ campaignId, onBack }: { campaignId: string; onBack: () => void }) {
+export default function GmChat({
+  campaignId,
+  setup,
+  onBack,
+}: {
+  campaignId: string
+  setup?: { players: number; mode: 'custom' | 'random' }
+  onBack: () => void
+}) {
   const threadKey = `gm_thread_id_${campaignId}`;
   const logKey = `gm_chat_log_${campaignId}`;
 
@@ -16,8 +24,27 @@ export default function GmChat({ campaignId, onBack }: { campaignId: string; onB
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string>('');
+  const recognitionRef = React.useRef<any>(null);
+  const [listening, setListening] = React.useState(false);
+  const [canVoice, setCanVoice] = React.useState(false);
 
   const base = import.meta.env.VITE_API_BASE as string;
+
+  React.useEffect(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = 'pl-PL';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      onSend(text);
+    };
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    setCanVoice(true);
+  }, []);
 
   async function speak(text: string) {
     try {
@@ -47,13 +74,21 @@ export default function GmChat({ campaignId, onBack }: { campaignId: string; onB
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
         setThreadId(newThreadId);
-        await sendInternal(newThreadId, 'Start', { silent: true });
+        let intro = 'Start';
+        if (setup) {
+          intro = `Start kampanii dla ${setup.players} graczy. ${
+            setup.mode === 'custom'
+              ? 'Stworzymy własne postacie i zarys fabuły.'
+              : 'Proszę wylosuj postacie i zarys fabuły.'
+          }`;
+        }
+        await sendInternal(newThreadId, intro, { silent: true });
       } catch (e: any) {
         console.error('[GmChat] Failed to create thread:', e);
         setError('Nie udało się połączyć z Mistrzem Gry. Spróbuj wysłać wiadomość ponownie.');
       }
     })();
-  }, [base, threadId]);
+  }, [base, threadId, setup]);
 
   React.useEffect(() => {
     if (threadId) {
@@ -124,16 +159,30 @@ export default function GmChat({ campaignId, onBack }: { campaignId: string; onB
     }
   }
 
-  async function onSend() {
-    const text = input.trim();
+  async function onSend(textOverride?: string) {
+    const text = (textOverride ?? input).trim();
     if (!text || busy) return;
-    setInput('');
+    if (!textOverride) setInput('');
     try {
       const currentThreadId = await ensureThread();
       await sendInternal(currentThreadId, text);
     } catch (e: any) {
       console.error('[GmChat] Error in onSend:', e);
       setError('Nie mogę utworzyć rozmowy z MG. Sprawdź konfigurację.');
+    }
+  }
+
+  function toggleListening() {
+    const rec = recognitionRef.current;
+    if (!rec) {
+      alert('Twoja przeglądarka nie obsługuje rozpoznawania mowy');
+      return;
+    }
+    if (listening) {
+      rec.stop();
+    } else {
+      setListening(true);
+      rec.start();
     }
   }
 
@@ -178,11 +227,18 @@ export default function GmChat({ campaignId, onBack }: { campaignId: string; onB
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') onSend(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSend()
+          }}
           placeholder="Napisz do Mistrza Gry…"
           style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #374151', background: '#0b0f1a', color: '#fff' }}
         />
-        <button disabled={busy || !input.trim()} onClick={onSend}>Wyślij</button>
+        {canVoice && (
+          <button disabled={busy} onClick={toggleListening}>
+            {listening ? '🎙️…' : '🎙️'}
+          </button>
+        )}
+        <button disabled={busy || !input.trim()} onClick={() => onSend()}>Wyślij</button>
       </div>
 
       {busy && <p style={{ opacity: 0.7, marginTop: 8 }}>MG myśli…</p>}
