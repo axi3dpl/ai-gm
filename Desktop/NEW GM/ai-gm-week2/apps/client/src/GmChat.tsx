@@ -141,12 +141,15 @@ export default function GmChat({
     opts?: { silent?: boolean }
   ) {
     console.log('[GmChat] sendInternal called with:', { currentThreadId, text });
+    const history = log
+      .map((m) => `${m.from === 'me' ? 'Gracz' : 'MG'}: ${m.text}`)
+      .join('\n');
     if (!opts?.silent) {
       setLog((l) => [...l, { from: 'me', text }]);
     }
     setBusy(true);
     setError('');
-    
+
     try {
       // add user message
       console.log('[GmChat] Adding message to thread:', currentThreadId);
@@ -156,7 +159,8 @@ export default function GmChat({
               playerInfo.name ? playerInfo.name : ''
             }${playerInfo.class ? `, klasa ${playerInfo.class}` : ''}.`
           : '';
-      const fullText = preamble ? `${preamble}\n${text}` : text;
+      const parts = [preamble, history, `Gracz: ${text}`].filter(Boolean);
+      const fullText = parts.join('\n');
       const r1 = await fetch(`${base}/api/gm/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
