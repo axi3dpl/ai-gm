@@ -27,7 +27,7 @@ export default function GmChat() {
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
         setThreadId(newThreadId);
-        await sendInternal(newThreadId, 'Start');
+        await sendInternal(newThreadId, 'Start', { silent: true });
       } catch (e: any) {
         console.error('[GmChat] Failed to create thread:', e);
         setError('Nie udało się połączyć z Mistrzem Gry. Spróbuj wysłać wiadomość ponownie.');
@@ -59,9 +59,15 @@ export default function GmChat() {
     return newThreadId;
   }
 
-  async function sendInternal(currentThreadId: string, text: string) {
+  async function sendInternal(
+    currentThreadId: string,
+    text: string,
+    opts?: { silent?: boolean }
+  ) {
     console.log('[GmChat] sendInternal called with:', { currentThreadId, text });
-    setLog((l) => [...l, { from: 'me', text }]);
+    if (!opts?.silent) {
+      setLog((l) => [...l, { from: 'me', text }]);
+    }
     setBusy(true);
     setError('');
     
