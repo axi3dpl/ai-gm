@@ -1,60 +1,52 @@
 import { Router } from "express";
 import OpenAI from "openai";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-const ASSISTANT_ID = process.env.ASSISTANT_GM_ID!;
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const GM_RULES = process.env.GM_RULES || "";
 
-if (!process.env.OPENAI_API_KEY) {
-  console.warn("[gmAssistants] Missing OPENAI_API_KEY");
-}
-if (!ASSISTANT_ID) {
-  console.warn("[gmAssistants] Missing ASSISTANT_GM_ID");
+interface Conversation {
+  messages: { role: "system" | "user" | "assistant"; content: string }[];
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const conversations = new Map<string, Conversation>();
 
-// Minimal shapes for messages
-type MsgPart =
-  | { type: "text"; text: { value: string } }
-  | { type: string; [k: string]: any };
-
-interface ThreadMessage {
-  id: string;
-  role: "user" | "assistant" | string;
-  content: MsgPart[];
-}
-
-router.post("/thread", async (_req, res) => {
+router.post("/thread", (req, res) => {
   try {
-    console.log("[/api/gm/thread] Creating new thread...");
-    const thread = await client.beta.threads.create();
-    console.log("[/api/gm/thread] Thread created:", thread.id);
-    res.json({ threadId: thread.id });
+    const { playerId } = req.body ?? {};
+    const id = randomUUID();
+    const convo: Conversation = { messages: [] };
+    if (GM_RULES) {
+      convo.messages.push({ role: "system", content: GM_RULES });
+    }
+    if (playerId) {
+      convo.messages.push({
+        role: "system",
+        content: `Rozmawiasz z graczem ${playerId}. Zapamiętaj tego gracza i prowadź spójną rozmowę tylko z nim.`,
+      });
+    }
+    conversations.set(id, convo);
+    res.json({ threadId: id });
   } catch (e: any) {
     console.error("[/api/gm/thread] error:", e?.message || e);
     res.status(500).json({ error: "thread error", detail: String(e?.message || e) });
   }
 });
 
-router.post("/message", async (req, res) => {
+router.post("/message", (req, res) => {
   try {
     const { threadId, content } = req.body ?? {};
-    console.log("[/api/gm/message] Received:", { threadId, content });
-    
     if (!threadId || !content) {
-      console.error("[/api/gm/message] Missing required fields");
       return res.status(400).json({ error: "threadId and content required" });
     }
-    
-    // Fixed: Correct parameter order for creating a message
-    const message = await client.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: content,
-    });
-    
-    console.log("[/api/gm/message] Message created:", message.id);
+    const convo = conversations.get(threadId);
+    if (!convo) {
+      return res.status(404).json({ error: "unknown threadId" });
+    }
+    convo.messages.push({ role: "user", content });
     res.json({ ok: true });
   } catch (e: any) {
     console.error("[/api/gm/message] error:", e?.message || e);
@@ -65,80 +57,22 @@ router.post("/message", async (req, res) => {
 router.post("/run", async (req, res) => {
   try {
     const { threadId } = req.body ?? {};
-    console.log("[/api/gm/run] Received request body:", req.body);
-    console.log("[/api/gm/run] Extracted threadId:", threadId, "type:", typeof threadId);
-    console.log("[/api/gm/run] Using ASSISTANT_ID:", ASSISTANT_ID);
-    
-    if (!threadId || typeof threadId !== 'string') {
-      console.error("[/api/gm/run] Invalid threadId:", threadId);
-      return res.status(400).json({ error: "Valid threadId required" });
+    if (!threadId) {
+      return res.status(400).json({ error: "threadId required" });
     }
-
-    if (!ASSISTANT_ID) {
-      console.error("[/api/gm/run] Missing ASSISTANT_GM_ID in environment");
-      return res.status(500).json({ error: "Assistant ID not configured" });
+    const convo = conversations.get(threadId);
+    if (!convo) {
+      return res.status(404).json({ error: "unknown threadId" });
     }
-
-    // Fixed: Correct parameter order for creating a run
-    console.log("[/api/gm/run] Creating run with threadId:", threadId, "and assistant_id:", ASSISTANT_ID);
-    const run = await client.beta.threads.runs.create(threadId, {
-      assistant_id: ASSISTANT_ID,
+    const completion = await client.chat.completions.create({
+      model: MODEL,
+      messages: convo.messages,
     });
-
-    console.log("[/api/gm/run] Run created:", run.id, "status:", run.status);
-
-    // Poll until done (60s timeout)
-    const startTs = Date.now();
-    let status = run.status;
-
-    while (status === "queued" || status === "in_progress") {
-      if (Date.now() - startTs > 60_000) {
-        console.error("[/api/gm/run] Run timeout");
-        return res.status(504).json({ error: "run timeout" });
-      }
-      
-      await sleep(800);
-      
-      // Fixed: Retrieve run by passing the run ID first and thread ID as a param object
-      const latest = await client.beta.threads.runs.retrieve(run.id, {
-        thread_id: threadId,
-      });
-      status = latest.status;
-      console.log("[/api/gm/run] Run status:", status);
-    }
-
-    if (status !== "completed") {
-      console.error("[/api/gm/run] Run failed with status:", status);
-      return res.status(500).json({ error: `run status: ${status}` });
-    }
-
-    // Fixed: Correct way to list messages
-    const list = await client.beta.threads.messages.list(threadId, {
-      order: "desc",
-      limit: 20,
-    });
-
-    const assistantMsg = (list.data as ThreadMessage[]).find(
-      (m: ThreadMessage) => m.role === "assistant"
-    );
-
-    let reply = "";
-    if (assistantMsg) {
-      for (const part of assistantMsg.content) {
-        if (part.type === "text") {
-          reply += (reply ? "\n" : "") + (part as Extract<MsgPart, { type: "text" }>).text.value;
-        }
-      }
-    }
-
+    const reply = completion.choices[0]?.message?.content?.trim();
     if (!reply) {
-      console.warn("[/api/gm/run] No reply from assistant");
-      return res.status(200).json({
-        reply: "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
-      });
+      return res.status(500).json({ error: "empty reply" });
     }
-
-    console.log("[/api/gm/run] Reply received, length:", reply.length);
+    convo.messages.push({ role: "assistant", content: reply });
     res.json({ reply });
   } catch (e: any) {
     console.error("[/api/gm/run] error:", e?.message || e);
