@@ -2,12 +2,15 @@ import React from 'react';
 
 type Msg = { from: 'gm' | 'me'; text: string };
 
-export default function GmChat() {
+export default function GmChat({ campaignId, onBack }: { campaignId: string; onBack: () => void }) {
+  const threadKey = `gm_thread_id_${campaignId}`;
+  const logKey = `gm_chat_log_${campaignId}`;
+
   const [threadId, setThreadId] = React.useState<string | undefined>(() =>
-    localStorage.getItem('gm_thread_id') || undefined
+    localStorage.getItem(threadKey) || undefined
   );
   const [log, setLog] = React.useState<Msg[]>(() => {
-    const saved = localStorage.getItem('gm_chat_log');
+    const saved = localStorage.getItem(logKey);
     return saved ? (JSON.parse(saved) as Msg[]) : [];
   });
   const [input, setInput] = React.useState('');
@@ -54,13 +57,13 @@ export default function GmChat() {
 
   React.useEffect(() => {
     if (threadId) {
-      localStorage.setItem('gm_thread_id', threadId);
+      localStorage.setItem(threadKey, threadId);
     }
-  }, [threadId]);
+  }, [threadId, threadKey]);
 
   React.useEffect(() => {
-    localStorage.setItem('gm_chat_log', JSON.stringify(log));
-  }, [log]);
+    localStorage.setItem(logKey, JSON.stringify(log));
+  }, [log, logKey]);
 
   async function ensureThread(): Promise<string> {
     if (threadId) {
@@ -136,7 +139,10 @@ export default function GmChat() {
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: 16, fontFamily: 'system-ui' }}>
-      <h2 style={{ marginBottom: 12 }}>AI Mistrz Gry — tworzenie fabuły</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>AI Mistrz Gry — tworzenie fabuły</h2>
+        <button onClick={onBack}>Zapisz i wyjdź</button>
+      </div>
       
       {/* Debug info */}
       <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
