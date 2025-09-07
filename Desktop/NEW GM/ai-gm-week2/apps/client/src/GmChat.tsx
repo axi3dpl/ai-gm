@@ -74,11 +74,7 @@ export default function GmChat({
     (async () => {
       try {
         console.log('[GmChat] Creating initial thread...');
-        const r = await fetch(`${base}/api/gm/thread`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: campaignId }),
-        });
+        const r = await fetch(`${base}/api/gm/thread`, { method: 'POST' });
         if (!r.ok) throw new Error(`thread ${r.status}`);
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
@@ -131,11 +127,7 @@ export default function GmChat({
       return threadId;
     }
     console.log('[GmChat] Creating new thread...');
-    const r = await fetch(`${base}/api/gm/thread`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: campaignId }),
-    });
+    const r = await fetch(`${base}/api/gm/thread`, { method: 'POST' });
     if (!r.ok) throw new Error(`thread ${r.status}`);
     const { threadId: newThreadId } = await r.json();
     console.log('[GmChat] New thread created:', newThreadId);
