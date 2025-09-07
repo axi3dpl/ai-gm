@@ -28,7 +28,6 @@ export default function GmChat({
   });
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [dots, setDots] = React.useState(0);
   const [error, setError] = React.useState<string>('');
   const recognitionRef = React.useRef<any>(null);
   const [listening, setListening] = React.useState(false);
@@ -52,7 +51,7 @@ export default function GmChat({
     setCanVoice(true);
   }, []);
 
-  async function speak(text: string): Promise<number> {
+  async function speak(text: string) {
     try {
       const r = await fetch(`${base}/api/gm/speech`, {
         method: 'POST',
@@ -63,33 +62,10 @@ export default function GmChat({
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      await new Promise((res) => {
-        audio.addEventListener('loadedmetadata', res, { once: true });
-      });
-      const duration = audio.duration;
       audio.play();
-      return duration;
     } catch (e) {
       console.error('[GmChat] TTS error:', e);
-      return 0;
     }
-  }
-
-  function revealText(full: string, duration: number, index: number) {
-    const total = full.length;
-    const interval = duration > 0 ? (duration * 1000) / total : 30;
-    let shown = 0;
-    const id = setInterval(() => {
-      shown++;
-      setLog((l) => {
-        const copy = [...l];
-        if (copy[index]) {
-          copy[index] = { ...copy[index], text: full.slice(0, shown) };
-        }
-        return copy;
-      });
-      if (shown >= total) clearInterval(id);
-    }, interval);
   }
 
   // Try to auto-create a thread on mount (non-blocking)
@@ -205,10 +181,8 @@ export default function GmChat({
         throw new Error(`run ${r2.status}: ${errorText}`);
       }
       const { reply } = await r2.json();
-      const gmIndex = log.length;
-      setLog((l) => [...l, { from: 'gm', text: '' }]);
-      const dur = await speak(reply);
-      revealText(reply, dur, gmIndex);
+      setLog((l) => [...l, { from: 'gm', text: reply }]);
+      speak(reply);
     } catch (e: any) {
       console.error('[GmChat] Error in sendInternal:', e);
       setError('Problem z odpowiedzią MG. Sprawdź połączenie i spróbuj ponownie.');
@@ -244,17 +218,6 @@ export default function GmChat({
       rec.start();
     }
   }
-
-  React.useEffect(() => {
-    if (!busy) {
-      setDots(0);
-      return;
-    }
-    const id = setInterval(() => {
-      setDots((d) => (d + 1) % 4);
-    }, 500);
-    return () => clearInterval(id);
-  }, [busy]);
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: 16, fontFamily: 'system-ui' }}>
@@ -311,11 +274,7 @@ export default function GmChat({
         <button disabled={busy || !input.trim()} onClick={() => onSend()}>Wyślij</button>
       </div>
 
-      {busy && (
-        <p style={{ opacity: 0.7, marginTop: 8 }}>
-          MG myśli{'.'.repeat(dots)}
-        </p>
-      )}
+      {busy && <p style={{ opacity: 0.7, marginTop: 8 }}>MG myśli…</p>}
     </div>
   );
 }
