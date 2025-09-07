@@ -48,7 +48,8 @@ router.post("/message", async (req, res) => {
       return res.status(400).json({ error: "threadId and content required" });
     }
     
-    const message = await client.beta.threads.messages.create(threadId, {
+    // Use type assertion to handle SDK version differences
+    const message = await (client.beta.threads.messages as any).create(threadId, {
       role: "user",
       content: content,
     });
@@ -77,9 +78,9 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: "Assistant ID not configured" });
     }
 
-    // Start run
+    // Start run - use type assertion to handle SDK version differences
     console.log("[/api/gm/run] Creating run...");
-    const run = await client.beta.threads.runs.create(threadId, {
+    const run = await (client.beta.threads.runs as any).create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
@@ -96,7 +97,9 @@ router.post("/run", async (req, res) => {
       }
       
       await sleep(800);
-      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+      
+      // Use type assertion to handle SDK version differences
+      const latest = await (client.beta.threads.runs as any).retrieve(threadId, run.id);
       status = latest.status;
       console.log("[/api/gm/run] Run status:", status);
     }
@@ -106,8 +109,8 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // List messages
-    const list = await client.beta.threads.messages.list(threadId, {
+    // List messages - use type assertion to handle SDK version differences
+    const list = await (client.beta.threads.messages as any).list(threadId, {
       order: "desc",
       limit: 20,
     });
