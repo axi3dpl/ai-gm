@@ -91,7 +91,7 @@ function NewCampaignForm({ onBack }: { onBack: () => void }) {
   )
 }
 
-function CampaignList({ onBack }: { onBack: () => void }) {
+function CampaignList({ onBack, onOpen }: { onBack: () => void; onOpen: (id: string) => void }) {
   const [items, setItems] = React.useState<Campaign[]>([])
   const [loading, setLoading] = React.useState(true)
   const [msg, setMsg] = React.useState('')
@@ -118,7 +118,7 @@ function CampaignList({ onBack }: { onBack: () => void }) {
         {items.map((c) => (
           <li key={c.id} style={{ marginBottom: 8 }}>
             <strong>{c.title}</strong> — {c.world} <em>({new Date(c.created_at).toLocaleString()})</em>
-            <button style={{ marginLeft: 8 }} onClick={() => alert('Kontynuuj: ' + c.title + ' (placeholder)')}>
+            <button style={{ marginLeft: 8 }} onClick={() => onOpen(c.id)}>
               Kontynuuj
             </button>
           </li>
@@ -134,6 +134,7 @@ export default function App() {
     const saved = localStorage.getItem('screen') as Screen | null
     return saved || 'auth'
   })
+  const [currentCampaignId, setCurrentCampaignId] = React.useState<string | null>(null)
   const [ready, setReady] = React.useState(false)
 
   React.useEffect(() => {
@@ -166,8 +167,18 @@ export default function App() {
   if (!ready) return <div style={{ fontFamily: 'system-ui', padding: 24 }}>Ładowanie…</div>
   if (screen === 'auth') return <AuthScreen onDone={() => setScreen('start')} />
   if (screen === 'new') return <NewCampaignForm onBack={() => setScreen('start')} />
-  if (screen === 'list') return <CampaignList onBack={() => setScreen('start')} />
-  if (screen === 'gm') return <GmChat />
+  if (screen === 'list')
+    return (
+      <CampaignList
+        onBack={() => setScreen('start')}
+        onOpen={(id) => {
+          setCurrentCampaignId(id)
+          setScreen('gm')
+        }}
+      />
+    )
+  if (screen === 'gm' && currentCampaignId)
+    return <GmChat campaignId={currentCampaignId} onBack={() => setScreen('start')} />
 
   return (
     <StartScreen
@@ -177,7 +188,18 @@ export default function App() {
         await signOut()
         setScreen('auth')
       }}
-      onGM={() => setScreen('gm')}
+      onGM={async () => {
+        try {
+          const c = await createCampaign({
+            title: `Kampania ${new Date().toLocaleString()}`,
+            world: 'fantasy',
+          })
+          setCurrentCampaignId(c.id)
+          setScreen('gm')
+        } catch (e: any) {
+          alert(e.message || 'Błąd tworzenia kampanii')
+        }
+      }}
     />
   )
 }
