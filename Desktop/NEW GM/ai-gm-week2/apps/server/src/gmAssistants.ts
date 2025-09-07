@@ -48,7 +48,8 @@ router.post("/message", async (req, res) => {
       return res.status(400).json({ error: "threadId and content required" });
     }
     
-    const message = await client.beta.threads.messages.create(threadId, {
+    const message = await client.beta.threads.messages.create({
+      thread_id: threadId,
       role: "user",
       content: content,
     });
@@ -79,7 +80,8 @@ router.post("/run", async (req, res) => {
 
     // Start run
     console.log("[/api/gm/run] Creating run...");
-    const run = await client.beta.threads.runs.create(threadId, {
+    const run = await client.beta.threads.runs.create({
+      thread_id: threadId,
       assistant_id: ASSISTANT_ID,
     });
 
@@ -96,7 +98,10 @@ router.post("/run", async (req, res) => {
       }
       
       await sleep(800);
-      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+      const latest = await client.beta.threads.runs.retrieve({
+        thread_id: threadId,
+        run_id: run.id
+      });
       status = latest.status;
       console.log("[/api/gm/run] Run status:", status);
     }
@@ -107,7 +112,8 @@ router.post("/run", async (req, res) => {
     }
 
     // List messages
-    const list = await client.beta.threads.messages.list(threadId, {
+    const list = await client.beta.threads.messages.list({
+      thread_id: threadId,
       order: "desc",
       limit: 20,
     });
