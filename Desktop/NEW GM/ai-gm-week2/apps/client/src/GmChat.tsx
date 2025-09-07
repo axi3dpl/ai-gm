@@ -13,6 +13,7 @@ export default function GmChat({
 }) {
   const threadKey = `gm_thread_id_${campaignId}`;
   const logKey = `gm_chat_log_${campaignId}`;
+  const infoKey = `gm_player_info_${campaignId}`;
 
   const [threadId, setThreadId] = React.useState<string | undefined>(() =>
     localStorage.getItem(threadKey) || undefined
@@ -20,6 +21,10 @@ export default function GmChat({
   const [log, setLog] = React.useState<Msg[]>(() => {
     const saved = localStorage.getItem(logKey);
     return saved ? (JSON.parse(saved) as Msg[]) : [];
+  });
+  const [playerInfo, setPlayerInfo] = React.useState<{ name?: string; class?: string }>(() => {
+    const saved = localStorage.getItem(infoKey);
+    return saved ? (JSON.parse(saved) as { name?: string; class?: string }) : {};
   });
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -100,6 +105,22 @@ export default function GmChat({
     localStorage.setItem(logKey, JSON.stringify(log));
   }, [log, logKey]);
 
+  React.useEffect(() => {
+    localStorage.setItem(infoKey, JSON.stringify(playerInfo));
+  }, [playerInfo, infoKey]);
+
+  function updatePlayerInfo(text: string) {
+    const nameMatch = text.match(/nazywa si[eę]\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)/i);
+    const classMatch = text.match(/(?:jest|będzie)\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)/i);
+    if (nameMatch || classMatch) {
+      setPlayerInfo((info) => ({
+        ...info,
+        ...(nameMatch ? { name: nameMatch[1] } : {}),
+        ...(classMatch ? { class: classMatch[1] } : {}),
+      }));
+    }
+  }
+
   async function ensureThread(): Promise<string> {
     if (threadId) {
       console.log('[GmChat] Using existing thread:', threadId);
@@ -129,10 +150,17 @@ export default function GmChat({
     try {
       // add user message
       console.log('[GmChat] Adding message to thread:', currentThreadId);
+      const preamble =
+        playerInfo.name || playerInfo.class
+          ? `Postać gracza: ${
+              playerInfo.name ? playerInfo.name : ''
+            }${playerInfo.class ? `, klasa ${playerInfo.class}` : ''}.`
+          : '';
+      const fullText = preamble ? `${preamble}\n${text}` : text;
       const r1 = await fetch(`${base}/api/gm/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId: currentThreadId, content: text }),
+        body: JSON.stringify({ threadId: currentThreadId, content: fullText }),
       });
       if (!r1.ok) throw new Error(`message ${r1.status}`);
 
@@ -164,6 +192,7 @@ export default function GmChat({
     if (!text || busy) return;
     if (!textOverride) setInput('');
     try {
+      updatePlayerInfo(text);
       const currentThreadId = await ensureThread();
       await sendInternal(currentThreadId, text);
     } catch (e: any) {
