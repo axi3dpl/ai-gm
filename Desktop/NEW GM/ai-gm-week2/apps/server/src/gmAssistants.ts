@@ -146,4 +146,43 @@ router.post("/run", async (req, res) => {
   }
 });
 
+router.post("/speech", async (req, res) => {
+  try {
+    const { text } = req.body ?? {};
+    const key = process.env.ELEVENLABS_KEY;
+    const voice = process.env.VOICE_ID;
+
+    if (!text) {
+      return res.status(400).json({ error: "text required" });
+    }
+    if (!key || !voice) {
+      console.warn("[gmAssistants] Missing ELEVENLABS_KEY or VOICE_ID");
+      return res.status(500).json({ error: "tts not configured" });
+    }
+
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": key,
+        Accept: "audio/mpeg",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      console.error("[/api/gm/speech] TTS failed:", r.status, err);
+      return res.status(500).json({ error: "tts failed", detail: err });
+    }
+
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.send(buf);
+  } catch (e: any) {
+    console.error("[/api/gm/speech] error:", e?.message || e);
+    res.status(500).json({ error: "tts error", detail: String(e?.message || e) });
+  }
+});
+
 export default router;

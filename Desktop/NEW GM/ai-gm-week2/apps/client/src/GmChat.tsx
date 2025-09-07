@@ -16,21 +16,21 @@ export default function GmChat() {
 
   const base = import.meta.env.VITE_API_BASE as string;
 
-  React.useEffect(() => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.getVoices();
+  async function speak(text: string) {
+    try {
+      const r = await fetch(`${base}/api/gm/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!r.ok) throw new Error(`speech ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.play();
+    } catch (e) {
+      console.error('[GmChat] TTS error:', e);
     }
-  }, []);
-
-  function speak(text: string) {
-    if (!('speechSynthesis' in window)) return;
-    const synth = window.speechSynthesis;
-    const utter = new SpeechSynthesisUtterance(text);
-    const voices = synth.getVoices();
-    const male = voices.find(v => /male|man|adam|jan|jacek|daniel|david/i.test(v.name));
-    if (male) utter.voice = male;
-    utter.pitch = 0.8;
-    synth.speak(utter);
   }
 
   // Try to auto-create a thread on mount (non-blocking)
