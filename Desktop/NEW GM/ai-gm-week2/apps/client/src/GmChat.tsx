@@ -79,13 +79,14 @@ export default function GmChat({
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
         setThreadId(newThreadId);
-        let intro = 'Start';
+        let intro =
+          'Start. Pamiętaj wszystkie wybory graczy i nie rozpoczynaj odpowiedzi od "Zrozumiałem!".';
         if (setup) {
           intro = `Start kampanii dla ${setup.players} graczy. ${
             setup.mode === 'custom'
               ? 'Stworzymy własne postacie i zarys fabuły.'
               : 'Proszę wylosuj postacie i zarys fabuły.'
-          }`;
+          } Pamiętaj wszystkie wybory graczy i nie rozpoczynaj odpowiedzi od "Zrozumiałem!".`;
         }
         await sendInternal(newThreadId, intro, { silent: true });
       } catch (e: any) {
@@ -110,7 +111,9 @@ export default function GmChat({
   }, [playerInfo, infoKey]);
 
   function updatePlayerInfo(text: string) {
-    const nameMatch = text.match(/nazywa si[eę]\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)/i);
+    const nameMatch =
+      text.match(/nazywa si[eę]\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)/i) ||
+      text.match(/to\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)\s+(?:jest|będzie)/i);
     const classMatch = text.match(/(?:jest|będzie)\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)/i);
     if (nameMatch || classMatch) {
       setPlayerInfo((info) => ({
@@ -141,9 +144,6 @@ export default function GmChat({
     opts?: { silent?: boolean }
   ) {
     console.log('[GmChat] sendInternal called with:', { currentThreadId, text });
-    const history = log
-      .map((m) => `${m.from === 'me' ? 'Gracz' : 'MG'}: ${m.text}`)
-      .join('\n');
     if (!opts?.silent) {
       setLog((l) => [...l, { from: 'me', text }]);
     }
@@ -159,7 +159,7 @@ export default function GmChat({
               playerInfo.name ? playerInfo.name : ''
             }${playerInfo.class ? `, klasa ${playerInfo.class}` : ''}.`
           : '';
-      const parts = [preamble, history, `Gracz: ${text}`].filter(Boolean);
+      const parts = [preamble, `Gracz: ${text}`].filter(Boolean);
       const fullText = parts.join('\n');
       const r1 = await fetch(`${base}/api/gm/message`, {
         method: 'POST',
