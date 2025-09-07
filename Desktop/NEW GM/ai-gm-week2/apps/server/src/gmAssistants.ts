@@ -28,7 +28,9 @@ interface ThreadMessage {
 
 router.post("/thread", async (_req, res) => {
   try {
+    console.log("[/api/gm/thread] Creating new thread...");
     const thread = await client.beta.threads.create();
+    console.log("[/api/gm/thread] Thread created:", thread.id);
     res.json({ threadId: thread.id });
   } catch (e: any) {
     console.error("[/api/gm/thread] error:", e?.message || e);
@@ -39,14 +41,19 @@ router.post("/thread", async (_req, res) => {
 router.post("/message", async (req, res) => {
   try {
     const { threadId, content } = req.body ?? {};
+    console.log("[/api/gm/message] Received:", { threadId, content });
+    
     if (!threadId || !content) {
+      console.error("[/api/gm/message] Missing required fields");
       return res.status(400).json({ error: "threadId and content required" });
     }
-    // Cast to any to avoid SDK signature mismatches
-    await (client as any).beta.threads.messages.create(threadId, {
+    
+    const message = await client.beta.threads.messages.create(threadId, {
       role: "user",
-      content,
+      content: content,
     });
+    
+    console.log("[/api/gm/message] Message created:", message.id);
     res.json({ ok: true });
   } catch (e: any) {
     console.error("[/api/gm/message] error:", e?.message || e);
@@ -55,36 +62,52 @@ router.post("/message", async (req, res) => {
 });
 
 router.post("/run", async (req, res) => {
-  const { threadId } = req.body ?? {};
-  if (!threadId) return res.status(400).json({ error: "threadId required" });
-
   try {
-    // Start run (cast to any to be agnostic to SDK version)
-    const run = await (client as any).beta.threads.runs.create(threadId, {
+    const { threadId } = req.body ?? {};
+    console.log("[/api/gm/run] Received threadId:", threadId);
+    console.log("[/api/gm/run] Using ASSISTANT_ID:", ASSISTANT_ID);
+    
+    if (!threadId) {
+      console.error("[/api/gm/run] Missing threadId");
+      return res.status(400).json({ error: "threadId required" });
+    }
+
+    if (!ASSISTANT_ID) {
+      console.error("[/api/gm/run] Missing ASSISTANT_GM_ID in environment");
+      return res.status(500).json({ error: "Assistant ID not configured" });
+    }
+
+    // Start run
+    console.log("[/api/gm/run] Creating run...");
+    const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
+    console.log("[/api/gm/run] Run created:", run.id, "status:", run.status);
+
     // Poll until done (60s timeout)
     const startTs = Date.now();
-    let status = run.status as string;
+    let status = run.status;
 
     while (status === "queued" || status === "in_progress") {
       if (Date.now() - startTs > 60_000) {
+        console.error("[/api/gm/run] Run timeout");
         return res.status(504).json({ error: "run timeout" });
       }
+      
       await sleep(800);
-
-      // Retrieve (cast to any; supports positional or object under the hood)
-      const latest = await (client as any).beta.threads.runs.retrieve(threadId, run.id);
-      status = latest.status as string;
+      const latest = await client.beta.threads.runs.retrieve(threadId, run.id);
+      status = latest.status;
+      console.log("[/api/gm/run] Run status:", status);
     }
 
     if (status !== "completed") {
+      console.error("[/api/gm/run] Run failed with status:", status);
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
-    // List messages (cast to any; use positional signature)
-    const list = await (client as any).beta.threads.messages.list(threadId, {
+    // List messages
+    const list = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
     });
@@ -103,12 +126,13 @@ router.post("/run", async (req, res) => {
     }
 
     if (!reply) {
+      console.warn("[/api/gm/run] No reply from assistant");
       return res.status(200).json({
-        reply:
-          "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
+        reply: "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
       });
     }
 
+    console.log("[/api/gm/run] Reply received, length:", reply.length);
     res.json({ reply });
   } catch (e: any) {
     console.error("[/api/gm/run] error:", e?.message || e);
