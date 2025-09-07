@@ -16,6 +16,23 @@ export default function GmChat() {
 
   const base = import.meta.env.VITE_API_BASE as string;
 
+  React.useEffect(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
+  }, []);
+
+  function speak(text: string) {
+    if (!('speechSynthesis' in window)) return;
+    const synth = window.speechSynthesis;
+    const utter = new SpeechSynthesisUtterance(text);
+    const voices = synth.getVoices();
+    const male = voices.find(v => /male|man|adam|jan|jacek|daniel|david/i.test(v.name));
+    if (male) utter.voice = male;
+    utter.pitch = 0.8;
+    synth.speak(utter);
+  }
+
   // Try to auto-create a thread on mount (non-blocking)
   React.useEffect(() => {
     if (threadId) return;
@@ -95,6 +112,7 @@ export default function GmChat() {
       }
       const { reply } = await r2.json();
       setLog((l) => [...l, { from: 'gm', text: reply }]);
+      speak(reply);
     } catch (e: any) {
       console.error('[GmChat] Error in sendInternal:', e);
       setError('Problem z odpowiedzią MG. Sprawdź połączenie i spróbuj ponownie.');

@@ -5,6 +5,7 @@ Gotowy kod na **Tydzień 2**:
 - Ekran startowy: **Nowa kampania** / **Kontynuuj**
 - **Lista kampanii** użytkownika, tworzenie nowej, wybór kampanii do kontynuacji
 - Serwer Express (CJS) zostawiamy — endpoint `/health` i `/api/roll` jak wcześniej
+- Odpowiedzi Mistrza Gry są czytane męskim głosem narratora (Web Speech API)
 
 ## Wymagania
 - Node >= 20
