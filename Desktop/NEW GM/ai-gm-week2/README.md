@@ -18,6 +18,7 @@ npm i
 ```
 2) Skopiuj `.env.example` → `.env` w `apps/client` i `apps/server`.
    - W `apps/client/.env` ustaw `VITE_SUPABASE_URL` oraz `VITE_SUPABASE_ANON_KEY` (z Supabase → Settings → API).
+   - W `apps/server/.env` podaj `OPENAI_API_KEY` i opcjonalnie `OPENAI_MODEL`. W zmiennej `GM_RULES` wpisz zasady, których Mistrz Gry ma przestrzegać.
 3) W Supabase → SQL Editor → wklej i odpal `supabase/schema.sql`.
 4) Odpal w 2 terminalach:
 ```
