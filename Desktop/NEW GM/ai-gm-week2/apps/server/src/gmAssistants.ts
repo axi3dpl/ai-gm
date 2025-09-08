@@ -149,26 +149,17 @@ router.post("/run", async (req, res) => {
 router.post("/speech", async (req, res) => {
   try {
     const { text } = req.body ?? {};
-    const key = process.env.ELEVENLABS_KEY;
-    const voice = process.env.VOICE_ID;
 
     if (!text) {
       return res.status(400).json({ error: "text required" });
     }
-    if (!key || !voice) {
-      console.warn("[gmAssistants] Missing ELEVENLABS_KEY or VOICE_ID");
-      return res.status(500).json({ error: "tts not configured" });
-    }
 
-    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": key,
-        Accept: "audio/mpeg",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text }),
-    });
+    // Generate Polish speech via Google Translate TTS (no API key required)
+    const url =
+      "https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pl&ttsspeed=1&q=" +
+      encodeURIComponent(text);
+
+    const r = await fetch(url);
 
     if (!r.ok) {
       const err = await r.text();
