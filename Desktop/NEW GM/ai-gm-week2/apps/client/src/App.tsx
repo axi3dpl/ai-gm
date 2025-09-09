@@ -2,10 +2,10 @@ import React from 'react'
 import { supabase, signIn, signUp, signOut, fetchCampaigns, createCampaign, type Campaign } from './supabaseClient'
 import GmChat from './GmChat'
 
-type Screen = 'auth' | 'start' | 'list' | 'gm' | 'gmsetup'
+type Screen = 'auth' | 'start' | 'list' | 'gm'
 
 function isScreen(s: string | null): s is Screen {
-  return s === 'auth' || s === 'start' || s === 'list' || s === 'gm' || s === 'gmsetup'
+  return s === 'auth' || s === 'start' || s === 'list' || s === 'gm'
 }
 
 function AuthScreen({ onDone }: { onDone: () => void }) {
@@ -98,60 +98,6 @@ function CampaignList({ onBack, onOpen }: { onBack: () => void; onOpen: (id: str
   )
 }
 
-function GmSetup({
-  onBack,
-  onStart,
-}: {
-  onBack: () => void
-  onStart: (players: number, mode: 'custom' | 'random') => void
-}) {
-  const [players, setPlayers] = React.useState<number | null>(null)
-
-  if (players === null) {
-    return (
-      <div
-        style={{
-          maxWidth: 640,
-          margin: '64px auto',
-          fontFamily: 'system-ui',
-          display: 'grid',
-          gap: 12,
-        }}
-      >
-        <h2>Wybierz liczbę graczy</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[1, 2, 3, 4].map((n) => (
-            <button key={n} onClick={() => setPlayers(n)}>
-              {n}
-            </button>
-          ))}
-        </div>
-        <button onClick={onBack}>Wróć</button>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      style={{
-        maxWidth: 640,
-        margin: '64px auto',
-        fontFamily: 'system-ui',
-        display: 'grid',
-        gap: 12,
-      }}
-    >
-      <h2>{players} gracze. Jak rozpocząć?</h2>
-      <button onClick={() => onStart(players, 'custom')}>
-        Tworzymy postacie i fabułę
-      </button>
-      <button onClick={() => onStart(players, 'random')}>
-        Losuj postacie i fabułę
-      </button>
-      <button onClick={() => setPlayers(null)}>Wróć</button>
-    </div>
-  )
-}
 
 export default function App() {
   const [screen, setScreen] = React.useState<Screen>(() => {
@@ -159,7 +105,6 @@ export default function App() {
     return isScreen(saved) ? saved : 'auth'
   })
   const [currentCampaignId, setCurrentCampaignId] = React.useState<string | null>(null)
-  const [gmOptions, setGmOptions] = React.useState<{ players: number; mode: 'custom' | 'random' } | null>(null)
   const [ready, setReady] = React.useState(false)
 
   React.useEffect(() => {
@@ -205,29 +150,8 @@ export default function App() {
     return (
       <GmChat
         campaignId={currentCampaignId}
-        setup={gmOptions ?? undefined}
         onBack={() => {
           setScreen('start')
-          setGmOptions(null)
-        }}
-      />
-    )
-  if (screen === 'gmsetup')
-    return (
-      <GmSetup
-        onBack={() => setScreen('start')}
-        onStart={async (players, mode) => {
-          try {
-            const c = await createCampaign({
-              title: `Kampania ${new Date().toLocaleString()}`,
-              world: 'fantasy',
-            })
-            setCurrentCampaignId(c.id)
-            setGmOptions({ players, mode })
-            setScreen('gm')
-          } catch (e: any) {
-            alert(e.message || 'Błąd tworzenia kampanii')
-          }
         }}
       />
     )
@@ -239,7 +163,18 @@ export default function App() {
         await signOut()
         setScreen('auth')
       }}
-      onGM={() => setScreen('gmsetup')}
+      onGM={async () => {
+        try {
+          const c = await createCampaign({
+            title: `Kampania ${new Date().toLocaleString()}`,
+            world: 'fantasy',
+          })
+          setCurrentCampaignId(c.id)
+          setScreen('gm')
+        } catch (e: any) {
+          alert(e.message || 'Błąd tworzenia kampanii')
+        }
+      }}
     />
   )
 }
