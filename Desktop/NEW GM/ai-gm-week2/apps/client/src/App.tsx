@@ -2,7 +2,11 @@ import React from 'react'
 import { supabase, signIn, signUp, signOut, fetchCampaigns, createCampaign, type Campaign } from './supabaseClient'
 import GmChat from './GmChat'
 
-type Screen = 'auth' | 'start' | 'new' | 'list' | 'gm' | 'gmsetup'
+type Screen = 'auth' | 'start' | 'list' | 'gm' | 'gmsetup'
+
+function isScreen(s: string | null): s is Screen {
+  return s === 'auth' || s === 'start' || s === 'list' || s === 'gm' || s === 'gmsetup'
+}
 
 function AuthScreen({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = React.useState('')
@@ -40,53 +44,18 @@ function AuthScreen({ onDone }: { onDone: () => void }) {
 }
 
 interface StartScreenProps {
-  onNew: () => void
   onList: () => void
   onLogout: () => void
   onGM: () => void
 }
 
-function StartScreen({ onNew, onList, onLogout, onGM }: StartScreenProps) {
+function StartScreen({ onList, onLogout, onGM }: StartScreenProps) {
   return (
     <div style={{ maxWidth: 640, margin: '64px auto', fontFamily: 'system-ui', display: 'grid', gap: 12 }}>
       <h1>AI Game Master</h1>
-      <button onClick={onNew}>Nowa kampania (formularz)</button>
-      <button onClick={onGM}>Nowa kampania z MG</button>
+      <button onClick={onGM}>Nowa kampania</button>
       <button onClick={onList}>Kontynuuj</button>
       <button onClick={onLogout}>Wyloguj</button>
-    </div>
-  )
-}
-
-function NewCampaignForm({ onBack }: { onBack: () => void }) {
-  const [title, setTitle] = React.useState('Moja kampania')
-  const [world, setWorld] = React.useState<'fantasy' | 'scifi' | 'horror' | 'cyberpunk'>('fantasy')
-  const [msg, setMsg] = React.useState('')
-
-  async function submit() {
-    try {
-      await createCampaign({ title, world })
-      setMsg('Utworzono kampanię ✅')
-    } catch (e: any) {
-      setMsg(e.message || 'Błąd')
-    }
-  }
-
-  return (
-    <div style={{ maxWidth: 640, margin: '64px auto', fontFamily: 'system-ui', display: 'grid', gap: 12 }}>
-      <h2>Nowa kampania</h2>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tytuł" />
-      <select value={world} onChange={(e) => setWorld(e.target.value as any)}>
-        <option value="fantasy">Fantasy</option>
-        <option value="scifi">Sci-Fi</option>
-        <option value="horror">Horror</option>
-        <option value="cyberpunk">Cyberpunk</option>
-      </select>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={submit}>Zapisz</button>
-        <button onClick={onBack}>Wróć</button>
-      </div>
-      {msg && <p>{msg}</p>}
     </div>
   )
 }
@@ -186,8 +155,8 @@ function GmSetup({
 
 export default function App() {
   const [screen, setScreen] = React.useState<Screen>(() => {
-    const saved = localStorage.getItem('screen') as Screen | null
-    return saved || 'auth'
+    const saved = localStorage.getItem('screen')
+    return isScreen(saved) ? saved : 'auth'
   })
   const [currentCampaignId, setCurrentCampaignId] = React.useState<string | null>(null)
   const [gmOptions, setGmOptions] = React.useState<{ players: number; mode: 'custom' | 'random' } | null>(null)
@@ -200,8 +169,8 @@ export default function App() {
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        const saved = localStorage.getItem('screen') as Screen | null
-        setScreen(saved && saved !== 'auth' ? saved : 'start')
+        const saved = localStorage.getItem('screen')
+        setScreen(saved && isScreen(saved) && saved !== 'auth' ? saved : 'start')
       } else {
         setScreen('auth')
       }
@@ -209,8 +178,8 @@ export default function App() {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session) {
-        const saved = localStorage.getItem('screen') as Screen | null
-        setScreen(saved && saved !== 'auth' ? saved : 'start')
+        const saved = localStorage.getItem('screen')
+        setScreen(saved && isScreen(saved) && saved !== 'auth' ? saved : 'start')
       } else {
         setScreen('auth')
       }
@@ -222,7 +191,6 @@ export default function App() {
 
   if (!ready) return <div style={{ fontFamily: 'system-ui', padding: 24 }}>Ładowanie…</div>
   if (screen === 'auth') return <AuthScreen onDone={() => setScreen('start')} />
-  if (screen === 'new') return <NewCampaignForm onBack={() => setScreen('start')} />
   if (screen === 'list')
     return (
       <CampaignList
@@ -266,7 +234,6 @@ export default function App() {
 
   return (
     <StartScreen
-      onNew={() => setScreen('new')}
       onList={() => setScreen('list')}
       onLogout={async () => {
         await signOut()
