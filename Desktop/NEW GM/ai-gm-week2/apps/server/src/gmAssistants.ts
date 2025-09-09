@@ -1,6 +1,5 @@
 import { Router } from "express";
 import OpenAI from "openai";
-import { composePrompt, updateMemories } from "./memory";
 
 const router = Router();
 
@@ -41,77 +40,54 @@ router.post("/thread", async (_req, res) => {
 
 router.post("/message", async (req, res) => {
   try {
-    const { threadId, content, campaignId } = req.body ?? {};
-    console.log("[/api/gm/message] Received:", { threadId, content, campaignId });
-
+    const { threadId, content } = req.body ?? {};
+    console.log("[/api/gm/message] Received:", { threadId, content });
+    
     if (!threadId || !content) {
       console.error("[/api/gm/message] Missing required fields");
-      return res
-        .status(400)
-        .json({ error: "threadId and content required" });
+      return res.status(400).json({ error: "threadId and content required" });
     }
-
-    let finalContent = content;
-    if (campaignId) {
-      finalContent = await composePrompt(client, campaignId, content);
-    }
-
+    
+    // Fixed: Correct parameter order for creating a message
     const message = await client.beta.threads.messages.create(threadId, {
       role: "user",
-      content: finalContent,
+      content: content,
     });
-
+    
     console.log("[/api/gm/message] Message created:", message.id);
     res.json({ ok: true });
   } catch (e: any) {
     console.error("[/api/gm/message] error:", e?.message || e);
-    res
-      .status(500)
-      .json({ error: "message error", detail: String(e?.message || e) });
+    res.status(500).json({ error: "message error", detail: String(e?.message || e) });
   }
 });
 
 router.post("/run", async (req, res) => {
   try {
-    const { threadId, campaignId } = req.body ?? {};
+    const { threadId } = req.body ?? {};
     console.log("[/api/gm/run] Received request body:", req.body);
-    console.log(
-      "[/api/gm/run] Extracted threadId:",
-      threadId,
-      "type:",
-      typeof threadId
-    );
+    console.log("[/api/gm/run] Extracted threadId:", threadId, "type:", typeof threadId);
     console.log("[/api/gm/run] Using ASSISTANT_ID:", ASSISTANT_ID);
-
-    if (!threadId || typeof threadId !== "string") {
+    
+    if (!threadId || typeof threadId !== 'string') {
       console.error("[/api/gm/run] Invalid threadId:", threadId);
       return res.status(400).json({ error: "Valid threadId required" });
     }
 
     if (!ASSISTANT_ID) {
-      console.error(
-        "[/api/gm/run] Missing ASSISTANT_GM_ID in environment"
-      );
+      console.error("[/api/gm/run] Missing ASSISTANT_GM_ID in environment");
       return res.status(500).json({ error: "Assistant ID not configured" });
     }
 
-    console.log(
-      "[/api/gm/run] Creating run with threadId:",
-      threadId,
-      "and assistant_id:",
-      ASSISTANT_ID
-    );
+    // Fixed: Correct parameter order for creating a run
+    console.log("[/api/gm/run] Creating run with threadId:", threadId, "and assistant_id:", ASSISTANT_ID);
     const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
-    console.log(
-      "[/api/gm/run] Run created:",
-      run.id,
-      "status:",
-      run.status
-    );
+    console.log("[/api/gm/run] Run created:", run.id, "status:", run.status);
 
+    // Poll until done (60s timeout)
     const startTs = Date.now();
     let status = run.status;
 
@@ -120,9 +96,10 @@ router.post("/run", async (req, res) => {
         console.error("[/api/gm/run] Run timeout");
         return res.status(504).json({ error: "run timeout" });
       }
-
+      
       await sleep(800);
-
+      
+      // Fixed: Retrieve run by passing the run ID first and thread ID as a param object
       const latest = await client.beta.threads.runs.retrieve(run.id, {
         thread_id: threadId,
       });
@@ -135,6 +112,7 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: `run status: ${status}` });
     }
 
+    // Fixed: Correct way to list messages
     const list = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 20,
@@ -143,35 +121,21 @@ router.post("/run", async (req, res) => {
     const assistantMsg = (list.data as ThreadMessage[]).find(
       (m: ThreadMessage) => m.role === "assistant"
     );
-    const userMsg = (list.data as ThreadMessage[]).find(
-      (m: ThreadMessage) => m.role === "user"
-    );
 
-    const extractText = (msg?: ThreadMessage) => {
-      let txt = "";
-      if (!msg) return txt;
-      for (const part of msg.content) {
+    let reply = "";
+    if (assistantMsg) {
+      for (const part of assistantMsg.content) {
         if (part.type === "text") {
-          txt += (txt ? "\n" : "") +
-            (part as Extract<MsgPart, { type: "text" }>).text.value;
+          reply += (reply ? "\n" : "") + (part as Extract<MsgPart, { type: "text" }>).text.value;
         }
       }
-      return txt;
-    };
-
-    const reply = extractText(assistantMsg);
-    const userText = extractText(userMsg);
+    }
 
     if (!reply) {
       console.warn("[/api/gm/run] No reply from assistant");
       return res.status(200).json({
-        reply:
-          "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
+        reply: "(Brak odpowiedzi MG — sprawdź ASSISTANT_GM_ID/Instructions oraz logi serwera, czy run zakończył się poprawnie.)",
       });
-    }
-
-    if (campaignId) {
-      await updateMemories(client, campaignId, userText, reply);
     }
 
     console.log("[/api/gm/run] Reply received, length:", reply.length);

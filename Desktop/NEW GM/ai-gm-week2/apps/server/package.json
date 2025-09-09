@@ -11,8 +11,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "openai": "^5.19.1",
-    "@supabase/supabase-js": "^2.42.8"
+    "openai": "^5.19.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
