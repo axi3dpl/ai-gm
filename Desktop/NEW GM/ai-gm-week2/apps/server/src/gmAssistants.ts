@@ -1,5 +1,6 @@
 import { Router } from "express";
 import OpenAI from "openai";
+import { addPlayerMessage, getMemorySummary } from "./memory";
 
 const router = Router();
 
@@ -53,7 +54,12 @@ router.post("/message", async (req, res) => {
       role: "user",
       content: content,
     });
-    
+
+    // Store player's message in memory for future runs
+    if (typeof content === "string") {
+      addPlayerMessage(threadId, content);
+    }
+
     console.log("[/api/gm/message] Message created:", message.id);
     res.json({ ok: true });
   } catch (e: any) {
@@ -79,10 +85,14 @@ router.post("/run", async (req, res) => {
       return res.status(500).json({ error: "Assistant ID not configured" });
     }
 
+    // Include remembered player statements in the assistant run
+    const memory = getMemorySummary(threadId);
+
     // Fixed: Correct parameter order for creating a run
     console.log("[/api/gm/run] Creating run with threadId:", threadId, "and assistant_id:", ASSISTANT_ID);
     const run = await client.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
+      ...(memory ? { instructions: `Previous player statements:\n${memory}` } : {}),
     });
 
     console.log("[/api/gm/run] Run created:", run.id, "status:", run.status);
