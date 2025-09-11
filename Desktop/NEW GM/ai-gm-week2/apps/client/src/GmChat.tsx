@@ -88,22 +88,15 @@ export default function GmChat({
         const { threadId: newThreadId } = await r.json();
         console.log('[GmChat] Thread created:', newThreadId);
         setThreadId(newThreadId);
-        let intro =
-          'Start. Pamiętaj wszystkie wybory graczy i nie rozpoczynaj odpowiedzi od "Zrozumiałem!".';
-        if (setup) {
-          intro = `Start kampanii dla ${setup.players} graczy. ${
-            setup.mode === 'custom'
-              ? 'Stworzymy własne postacie i zarys fabuły.'
-              : 'Proszę wylosuj postacie i zarys fabuły.'
-          } Pamiętaj wszystkie wybory graczy i nie rozpoczynaj odpowiedzi od "Zrozumiałem!".`;
-        }
+        const intro =
+          'Witaj mistrzu, chcielibyśmy rozpocząć kampanię';
         await sendInternal(newThreadId, intro, { silent: true });
       } catch (e: any) {
         console.error('[GmChat] Failed to create thread:', e);
         setError('Nie udało się połączyć z Mistrzem Gry. Spróbuj wysłać wiadomość ponownie.');
       }
     })();
-  }, [base, threadId, setup]);
+  }, [base, threadId]);
 
   React.useEffect(() => {
     if (threadId) {
