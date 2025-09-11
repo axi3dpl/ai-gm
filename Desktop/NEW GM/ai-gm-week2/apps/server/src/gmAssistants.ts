@@ -16,6 +16,15 @@ if (!ASSISTANT_ID) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function sanitize(text: string): string {
+  return text
+    .replace(/[*_`~]/g, "")
+    .split("\n")
+    .map((line) => line.replace(/^[-•\d.]+\s*/, "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 // Minimal shapes for messages
 type MsgPart =
   | { type: "text"; text: { value: string } }
@@ -148,6 +157,7 @@ router.post("/run", async (req, res) => {
       });
     }
 
+    reply = sanitize(reply);
     console.log("[/api/gm/run] Reply received, length:", reply.length);
     res.json({ reply });
   } catch (e: any) {

@@ -2,6 +2,15 @@ import React from 'react';
 
 type Msg = { from: 'gm' | 'me'; text: string };
 
+function sanitize(text: string): string {
+  return text
+    .replace(/[*_`~]/g, '')
+    .split('\n')
+    .map((line) => line.replace(/^[-•\d.]+\s*/, '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 export default function GmChat({
   campaignId,
   setup,
@@ -181,8 +190,9 @@ export default function GmChat({
         throw new Error(`run ${r2.status}: ${errorText}`);
       }
       const { reply } = await r2.json();
-      setLog((l) => [...l, { from: 'gm', text: reply }]);
-      speak(reply);
+      const clean = sanitize(reply);
+      setLog((l) => [...l, { from: 'gm', text: clean }]);
+      speak(clean);
     } catch (e: any) {
       console.error('[GmChat] Error in sendInternal:', e);
       setError('Problem z odpowiedzią MG. Sprawdź połączenie i spróbuj ponownie.');
